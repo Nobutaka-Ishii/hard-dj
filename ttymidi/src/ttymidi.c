@@ -325,15 +325,17 @@ void write_midi_action_to_serial_port(snd_seq_t* seq_handle)
 			case SND_SEQ_EVENT_PGMCHANGE: 
 				bytes[0] = 0xC0 + ev->data.control.channel;
 				bytes[1] = ev->data.control.value;
+				bytes[2] = 0xFF;
 				if (!arguments.silent && arguments.verbose) 
-					printf("Alsa    0x%x Program change     %03u %03u %03u\n", bytes[0]&0xF0, bytes[0]&0xF, bytes[1], bytes[2]); 
+					printf("Alsa    0x%x Program change     %03u %03u %03d\n", bytes[0]&0xF0, bytes[0]&0xF, bytes[1], bytes[2]); 
 				break;  
 
 			case SND_SEQ_EVENT_CHANPRESS: 
 				bytes[0] = 0xD0 + ev->data.control.channel;
 				bytes[1] = ev->data.control.value;
+				bytes[2] = 0xFF;
 				if (!arguments.silent && arguments.verbose) 
-					printf("Alsa    0x%x Channel change     %03u %03u %03u\n", bytes[0]&0xF0, bytes[0]&0xF, bytes[1], bytes[2]); 
+					printf("Alsa    0x%x Channel change     %03u %03u %03d\n", bytes[0]&0xF0, bytes[0]&0xF, bytes[1], bytes[2]); 
 				break;  
 
 			case SND_SEQ_EVENT_PITCHBEND:
@@ -352,7 +354,7 @@ void write_midi_action_to_serial_port(snd_seq_t* seq_handle)
 		if (bytes[0]!=0x00)
 		{
 			bytes[1] = (bytes[1] & 0x7F); // just to be sure that one bit is really zero
-			if (bytes[2]==0xFF) {
+			if (bytes[2] == (char)0xFF) {
 				write(serial, bytes, 2);
 			} else {
 				bytes[2] = (bytes[2] & 0x7F);
@@ -474,7 +476,7 @@ void* read_midi_from_serial_port(void* seq)
 /* --------------------------------------------------------------------- */
 // Main program
 
-main(int argc, char** argv)
+int main(int argc, char** argv)
 {
 	//arguments arguments;
 	struct termios oldtio, newtio;
@@ -586,5 +588,6 @@ main(int argc, char** argv)
 	/* restore the old port settings */
 	tcsetattr(serial, TCSANOW, &oldtio);
 	printf("\ndone!\n");
+	return 0;
 }
 
