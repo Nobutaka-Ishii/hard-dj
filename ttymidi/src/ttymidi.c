@@ -281,7 +281,9 @@ void parse_midi_command(snd_seq_t* seq, int port_out_id, char *buf)
 void write_midi_action_to_serial_port(snd_seq_t* seq_handle) 
 {
 	snd_seq_event_t* ev;
-	char bytes[] = {0x00, 0x00, 0xFF}; 
+	char* bytes;
+	int len;
+	int itr;
 
 	do 
 	{
@@ -291,6 +293,10 @@ void write_midi_action_to_serial_port(snd_seq_t* seq_handle)
 		{
 
 			case SND_SEQ_EVENT_NOTEOFF: 
+				len = 3;
+				bytes = (char*)malloc(sizeof(char) * len);
+				memset(bytes, 0, sizeof(char)* len);
+
 				bytes[0] = 0x80 + ev->data.control.channel;
 				bytes[1] = ev->data.note.note;
 				bytes[2] = ev->data.note.velocity;        
@@ -299,6 +305,10 @@ void write_midi_action_to_serial_port(snd_seq_t* seq_handle)
 				break; 
 
 			case SND_SEQ_EVENT_NOTEON:
+				len = 3;
+				bytes = (char*)malloc(sizeof(char) * len);
+				memset(bytes, 0, sizeof(char)* len);
+
 				bytes[0] = 0x90 + ev->data.control.channel;
 				bytes[1] = ev->data.note.note;
 				bytes[2] = ev->data.note.velocity;        
@@ -307,6 +317,10 @@ void write_midi_action_to_serial_port(snd_seq_t* seq_handle)
 				break;        
 
 			case SND_SEQ_EVENT_KEYPRESS: 
+				len = 3;
+				bytes = (char*)malloc(sizeof(char) * len);
+				memset(bytes, 0, sizeof(char)* len);
+
 				bytes[0] = 0x90 + ev->data.control.channel;
 				bytes[1] = ev->data.note.note;
 				bytes[2] = ev->data.note.velocity;        
@@ -315,6 +329,10 @@ void write_midi_action_to_serial_port(snd_seq_t* seq_handle)
 				break;       
 
 			case SND_SEQ_EVENT_CONTROLLER: 
+				len = 3;
+				bytes = (char*)malloc(sizeof(char) * len);
+				memset(bytes, 0, sizeof(char)* len);
+
 				bytes[0] = 0xB0 + ev->data.control.channel;
 				bytes[1] = ev->data.control.param;
 				bytes[2] = ev->data.control.value;
@@ -323,22 +341,32 @@ void write_midi_action_to_serial_port(snd_seq_t* seq_handle)
 				break;   
 
 			case SND_SEQ_EVENT_PGMCHANGE: 
+				len = 2;
+				bytes = (char*)malloc(sizeof(char) * len);
+				memset(bytes, 0, sizeof(char)* len);
+
 				bytes[0] = 0xC0 + ev->data.control.channel;
 				bytes[1] = ev->data.control.value;
-				bytes[2] = 0xFF;
 				if (!arguments.silent && arguments.verbose) 
-					printf("Alsa    0x%x Program change     %03u %03u %03d\n", bytes[0]&0xF0, bytes[0]&0xF, bytes[1], bytes[2]); 
+					printf("Alsa    0x%x Program change     %03u %03u\n", bytes[0]&0xF0, bytes[0]&0xF, bytes[1]); 
 				break;  
 
 			case SND_SEQ_EVENT_CHANPRESS: 
+				len = 2;
+				bytes = (char*)malloc(sizeof(char) * len);
+				memset(bytes, 0, sizeof(char)* len);
+
 				bytes[0] = 0xD0 + ev->data.control.channel;
 				bytes[1] = ev->data.control.value;
-				bytes[2] = 0xFF;
 				if (!arguments.silent && arguments.verbose) 
-					printf("Alsa    0x%x Channel change     %03u %03u %03d\n", bytes[0]&0xF0, bytes[0]&0xF, bytes[1], bytes[2]); 
+					printf("Alsa    0x%x Channel change     %03u %03u\n", bytes[0]&0xF0, bytes[0]&0xF, bytes[1]); 
 				break;  
 
 			case SND_SEQ_EVENT_PITCHBEND:
+				len = 3;
+				bytes = (char*)malloc(sizeof(char) * len);
+				memset(bytes, 0, sizeof(char)* len);
+
 				bytes[0] = 0xE0 + ev->data.control.channel;
 				ev->data.control.value += 8192;
 				bytes[1] = (int)ev->data.control.value & 0x7F;
@@ -347,22 +375,36 @@ void write_midi_action_to_serial_port(snd_seq_t* seq_handle)
 					printf("Alsa    0x%x Pitch bend         %03u %5d\n", bytes[0]&0xF0, bytes[0]&0xF, ev->data.control.value);
 				break;
 
+			case SND_SEQ_EVENT_SYSEX:
+				len = ev->data.ext.len;
+				bytes = (char*)malloc(sizeof(char) * len);
+				memset(bytes, 0, sizeof(char)* len);
+
+				bytes[0] = 0xF0;
+				bytes[1] = 0x43;
+				bytes[2] = 0x10;
+				bytes[3] = 0x4C; // target device needs it.
+				bytes[len-1] = 0xF7;
+				for( itr = 4; itr < (len-1); itr++){
+					bytes[itr] = ((char*)(ev->data.ext.ptr))[itr];
+				}
+
+				if (!arguments.silent && arguments.verbose) 
+					printf("Alsa    0x%x System exclusive   (length:%2d)\n", bytes[0]&0xF0, len);
+				break;
+
 			default:
 				break;
 		}
 
-		if (bytes[0]!=0x00)
+		if ( len > 1 )
 		{
 			bytes[1] = (bytes[1] & 0x7F); // just to be sure that one bit is really zero
-			if (bytes[2] == (char)0xFF) {
-				write(serial, bytes, 2);
-			} else {
-				bytes[2] = (bytes[2] & 0x7F);
-				write(serial, bytes, 3);
-			}
+			write(serial, bytes, len);
 		}
 
 		snd_seq_free_event(ev);
+		if(len) free(bytes);
 
 	} while (snd_seq_event_input_pending(seq_handle, 0) > 0);
 }
