@@ -41,9 +41,6 @@
 /* change this definition for the correct port */
 //#define _POSIX_SOURCE 1 /* POSIX compliant source */
 
-	// system exclusive prefix in hexdecimal. This is the example of MU100B
-#define SYSEX_PREFIX	0xf043104c
-
 int run;
 int serial;
 int port_out_id;
@@ -286,25 +283,6 @@ void write_midi_action_to_serial_port(snd_seq_t* seq_handle)
 	snd_seq_event_t* ev;
 	char* bytes;
 	int len;
-	int itr;
-	unsigned int sysex;
-	int sysex_prefix_len = 0;
-	unsigned char* sysex_be;
-	unsigned char* sysex_le;
-
-	sysex = SYSEX_PREFIX;
-	sysex_le = (char*)malloc(sizeof(char));
-	while(sysex){
-		sysex_prefix_len++;
-		sysex_le = (unsigned char*)realloc( (unsigned char*)sysex_le, sizeof(unsigned char) * sysex_prefix_len);
-		sysex_le[sysex_prefix_len -1] = (sysex & 0xFF);
-		sysex >>= 8;
-	}
-
-	sysex_be = (char*)malloc(sizeof(char) * sysex_prefix_len);
-	for( itr = 0; itr < sysex_prefix_len; itr++){
-		sysex_be[sysex_prefix_len - itr - 1] = sysex_le[itr];
-	}
 
 	do 
 	{
@@ -399,12 +377,8 @@ void write_midi_action_to_serial_port(snd_seq_t* seq_handle)
 			case SND_SEQ_EVENT_SYSEX:
 				len = ev->data.ext.len;
 				bytes = (char*)malloc(sizeof(char) * len);
-				memset(bytes, 0, sizeof(char)* len);
 
-				memcpy(bytes, sysex_be, sysex_prefix_len);
-				memcpy(bytes + sysex_prefix_len,\
-					 (char*)(ev->data.ext.ptr) + sysex_prefix_len, len - sysex_prefix_len - 1);
-				bytes[len-1] = 0xF7;
+				memcpy(bytes, (char*)(ev->data.ext.ptr), len);
 
 				if (!arguments.silent && arguments.verbose) 
 					printf("Alsa    0x%x System exclusive   (length:%2d)\n", bytes[0]&0xF0, len);
@@ -424,9 +398,6 @@ void write_midi_action_to_serial_port(snd_seq_t* seq_handle)
 		if(len) free(bytes);
 
 	} while (snd_seq_event_input_pending(seq_handle, 0) > 0);
-
-	free(sysex_le);
-	free(sysex_be);
 }
 
 
