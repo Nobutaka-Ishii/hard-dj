@@ -385,10 +385,13 @@ void write_midi_action_to_serial_port(snd_seq_t* seq_handle)
 				break;
 
 			default:
+				len = 0;
+				if (!arguments.silent && arguments.verbose) 
+					printf("Any alsa sequencer message other than under control received\n");
 				break;
 		}
 
-		if ( len > 1 )
+		if ( len > 0 )
 		{
 			bytes[1] = (bytes[1] & 0x7F); // just to be sure that one bit is really zero
 			write(serial, bytes, len);
